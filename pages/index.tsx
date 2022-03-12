@@ -81,7 +81,7 @@ const Home: NextPage = () => {
     const params = [{
       from: address,
       to: "0x31CcF01d1819bebD90072B7D8e5F2Bb6438eba88",
-      value: utils.parseUnits('0.0025', 'ether').toHexString()
+      value: utils.parseUnits('0.005', 'ether').toHexString()
     }];
     await provider.send('eth_sendTransaction', params)
   }
@@ -185,7 +185,7 @@ const Home: NextPage = () => {
             type="button"
             className={status == "CONNECTED" || status == "AUTHENTICATED" ? 'relative inline-flex items-center px-6 py-4 rounded-md border border-gray-300 bg-gray-200 text-sm font-medium text-gray-700 focus:z-10 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500' : "relative inline-flex items-center px-6 py-4 rounded-md border border-blue-300 bg-blue-200 text-sm font-medium text-blue-700 hover:bg-blue-300 hover:border-blue-400 focus:z-10 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"}
           >
-            Connect Provider
+            Connect Wallet
           </button>
           <button
             onClick={login}
