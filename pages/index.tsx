@@ -8,6 +8,7 @@ import { toast } from 'react-toastify';
 import Axios from "axios";
 import { hashMessage, recoverAddress } from "../lib/eth_utils";
 import { EthResponse, NonceResponse, Status } from '@gotrue/types';
+import { event } from '../lib/ga';
 
 const gotrueUrl = process.env.NEXT_PUBLIC_GOTRUE_URL;
 
@@ -33,6 +34,14 @@ const Home: NextPage = () => {
 
   function reset() {
     console.log("reset");
+    event("RESET", {
+      previous: {
+        chain_id: chainId,
+        address: account,
+        status: status,
+        account: account?.user
+      }
+    })
     setProvider(undefined);
     setChainId(1);
     setAccount(undefined);
@@ -59,6 +68,11 @@ const Home: NextPage = () => {
       const provider = new providers.Web3Provider(web3Provider);
       setProvider(provider);
       setStatus("CONNECTED")
+      event("PROVIDER_CONNECTED", {
+        accounts,
+        select_account: account,
+        chainId: chainId
+      })
     } catch (e) {
       toast.error('Connection Aborted!', {
         position: "top-right",
@@ -71,6 +85,10 @@ const Home: NextPage = () => {
       });
 
       reset();
+
+      event("PROVIDER_CONNECTION_FAILED", {
+        error: (e as Error).message
+      })
     }
   }
 
@@ -83,7 +101,17 @@ const Home: NextPage = () => {
       to: "0x31CcF01d1819bebD90072B7D8e5F2Bb6438eba88",
       value: utils.parseUnits('0.005', 'ether').toHexString()
     }];
-    await provider.send('eth_sendTransaction', params)
+    try {
+      await provider.send('eth_sendTransaction', params)
+      event("DONATION_SUCCESS", {
+        from: address
+      })
+    } catch (e) {
+      event("DONATION_FAILED", {
+        from: address,
+        error: (e as Error).message
+      })
+    }
   }
 
   async function login() {
@@ -106,11 +134,12 @@ const Home: NextPage = () => {
       return;
     }
     try {
-      const res = await Axios.post<NonceResponse>(`${gotrueUrl}/nonce`, {
+      const body = {
         wallet_address: address,
         chain_id: chainId.toString(),
         url: window.location.href
-      })
+      }
+      const res = await Axios.post<NonceResponse>(`${gotrueUrl}/nonce`, body)
   
       if(!(res.status >= 200 && res.status < 300)) {
         toast.error('Failed to fetch nonce from Gotrue; please try again!', {
@@ -123,8 +152,23 @@ const Home: NextPage = () => {
           progress: undefined,
         });
         reset();
+        event("NONCE_REQ_FAILED", {
+          response: {
+            status: res.status,
+            body: res.data
+          },
+          request: {
+            url: `${gotrueUrl}/nonce`,
+            body: body
+          }
+        })
         return;
       }
+
+      event("NONCE_REQ_SUCCESS", {
+        nonce_id: res.data.id,
+        nonce_content: res.data.nonce
+      })
   
       const sig = await provider.send("personal_sign", [res.data.nonce, address]);
       console.log("Signature", sig);
@@ -132,10 +176,11 @@ const Home: NextPage = () => {
       console.log("recoveredAddress", sigAddress)
       console.log("isValid", sigAddress === address);
   
-      const ethRes = await Axios.post<EthResponse>(`${gotrueUrl}/eth`, {
+      const ethBody = {
         nonce_id: res.data.id,
         signature: sig
-      });
+      };
+      const ethRes = await Axios.post<EthResponse>(`${gotrueUrl}/eth`, ethBody);
   
       if(!(res.status >= 200 && res.status < 300)) {
         toast.error('Failed to authenticate with GoTrue; please try again!', {
@@ -148,11 +193,24 @@ const Home: NextPage = () => {
           progress: undefined,
         });
         reset();
+        event("ETH_REQ_FAILED", {
+          response: {
+            status: ethRes.status,
+            body: ethRes.data
+          },
+          request: {
+            url: `${gotrueUrl}/eth`,
+            body: ethBody
+          }
+        })
         return;
       }
 
       setAccount(ethRes.data)
       setStatus("AUTHENTICATED")
+      event("AUTHENTICATED", {
+        account: ethRes.data.user
+      })
     } catch (e) {
       toast.error('Connection Aborted!', {
         position: "top-right",
@@ -165,6 +223,10 @@ const Home: NextPage = () => {
       });
 
       reset();
+
+      event("AUTHENTICATION_FAILED", {
+        error: (e as Error).message
+      })
     }
   }
 
